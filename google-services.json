@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "939824244381",
+    "project_id": "temp-app-a3984",
+    "storage_bucket": "temp-app-a3984.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:939824244381:android:958deb2621039f27091674",
+        "android_client_info": {
+          "package_name": "com.tharushi.tempapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZd82KkF8RSzWLvrN1L5yz4msuD76XRpU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
