@@ -1,4 +1,3 @@
-// app/(tabs)/alerts.tsx
 import { useState, useEffect } from 'react';
 import { StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { Text, View } from '@/components/Themed';
@@ -12,34 +11,47 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-type Alert = {
+type AlertReading = {
   id: string;
   temperature: number;
   status: string;
   deviceId: string;
   timestamp: string;
+  latitude?: number;
+  longitude?: number;
+  altitude?: number;
+  speed?: number;
+  satellites?: number;
 };
 
 export default function AlertsScreen() {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alerts, setAlerts] = useState<AlertReading[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(
+    const readingsQuery = query(
       collection(db, 'readings'),
-      where('status', '==', 'ABNORMAL'),   // ← filter only abnormal
+      where('status', '==', 'ABNORMAL'),
       orderBy('timestamp', 'desc'),
       limit(50)
     );
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<Alert, 'id'>),
-      }));
-      setAlerts(data);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      readingsQuery,
+      (snapshot) => {
+        const data = snapshot.docs.map((document) => ({
+          id: document.id,
+          ...(document.data() as Omit<AlertReading, 'id'>),
+        }));
+
+        setAlerts(data);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Failed to load alerts:', error);
+        setLoading(false);
+      }
+    );
 
     return unsubscribe;
   }, []);
@@ -55,7 +67,7 @@ export default function AlertsScreen() {
   if (alerts.length === 0) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyTitle}>🎉 No alerts</Text>
+        <Text style={styles.emptyTitle}>No alerts</Text>
         <Text style={styles.emptyHint}>
           Everything is running normally
         </Text>
@@ -74,15 +86,33 @@ export default function AlertsScreen() {
           return (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.alertIcon}>⚠️</Text>
+                <Text style={styles.alertIcon}>!</Text>
                 <Text style={styles.alertTitle}>High Temperature</Text>
               </View>
 
               <Text style={styles.temp}>{item.temperature}°C</Text>
 
               <Text style={styles.meta}>
-                {item.deviceId} · {time}
+                Device: {item.deviceId}
               </Text>
+
+              <Text style={styles.meta}>
+                Time: {time}
+              </Text>
+
+              {item.latitude !== undefined &&
+                item.longitude !== undefined && (
+                  <Text style={styles.location}>
+                    GPS: {item.latitude.toFixed(6)},{' '}
+                    {item.longitude.toFixed(6)}
+                  </Text>
+                )}
+
+              {item.satellites !== undefined && (
+                <Text style={styles.meta}>
+                  Satellites: {item.satellites}
+                </Text>
+              )}
             </View>
           );
         }}
@@ -123,7 +153,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   alertIcon: {
-    fontSize: 20,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'red',
+    color: 'white',
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
     marginRight: 8,
   },
   alertTitle: {
@@ -141,6 +178,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.6,
     marginTop: 4,
+  },
+  location: {
+    fontSize: 13,
+    color: 'green',
+    marginTop: 8,
   },
   separator: {
     height: 1,
