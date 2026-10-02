@@ -45,6 +45,7 @@ function RootLayoutNav() {
         console.log('👤 Logged in:', user.email);
         try {
           const token = await registerForPushNotifications();
+          // Only attempt to save the token if one was successfully returned
           if (token) {
             await setDoc(
               doc(db, 'users', user.uid),
@@ -56,6 +57,8 @@ function RootLayoutNav() {
               { merge: true }
             );
             console.log('✅ Token saved to Firestore');
+          } else {
+            console.log('ℹ️ Proceeding without push token (Local/Sandbox run)');
           }
         } catch (err) {
           console.log('❌ Error registering notifications:', err);

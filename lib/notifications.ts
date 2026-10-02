@@ -1,76 +1,52 @@
 // lib/notifications.ts
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-// How notifications appear when app is in foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Detect if the runtime environment is the standard Expo Go sandboxed app
+const isExpoGo = Constants.appOwnership === 'expo';
 
-export async function registerForPushNotifications(): Promise<string | null> {
-  // 1. Must be a physical device
-  if (!Device.isDevice) {
-    console.log('⚠️ Must use physical device');
+export async function registerForPushNotifications() {
+  // 1. Safe-guard for Web browsers
+  if (Platform.OS === 'web') {
+    console.log('🌐 Web platform detected: Skipping push notification tokens.');
     return null;
   }
 
-  // 2. Check existing permission
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  // 3. Ask permission if not granted
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
+  // 2. Safe-guard for standard Expo Go on Android (Prevents the top-level SDK 53 file import crash)
+  if (isExpoGo && Platform.OS === 'android') {
+    console.warn("⚠️ Push notifications skipped: Standard Expo Go environment detected. Build a custom development build to use this feature.");
+    return null; 
   }
 
-  if (finalStatus !== 'granted') {
-    console.log('❌ Permission denied');
-    return null;
-  }
-
-  // 4. Android notification channel
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'Temperature Alerts',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-      //sound: 'default',
-    });
-  }
-
-  // 5. Get push token
+  // 3. Dynamic Native Module Import (Only runs on proper Custom Development Builds or Production APKs)
   try {
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    console.log('📋 Project ID:', projectId);
+    // We dynamically require the module here so Expo Go never evaluates it on bootup
+    const Notifications = require('expo-notifications');
 
-    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    console.log('📱 Push token:', token);
+    if (!Device.isDevice) {
+      console.log('📱 Must use a physical device for Push Notifications');
+      return null;
+    }
+    
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    
+    if (finalStatus !== 'granted') {
+      console.log('❌ Failed to get push token for push notification!');
+      return null;
+    }
+    
+    // Fetch native push token safely
+    const token = (await Notifications.getDevicePushTokenAsync()).data;
     return token;
-  } catch (err) {
-    console.log('❌ Token error:', err);
+  } catch (error) {
+    console.error('❌ Notification System Error:', error);
     return null;
   }
-}
-
-// Helper to send a LOCAL test notification (no server needed!)
-export async function sendTestNotification() {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: '🚨 Test Alert',
-      body: 'Temperature is ABNORMAL!',
-      sound: 'default',
-    },
-    trigger: null,  // immediate
-  });
-  console.log('✅ Test notification sent');
 }

@@ -1,4 +1,3 @@
-// app/(tabs)/history.tsx
 import { useState, useEffect } from 'react';
 import { StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { Text, View } from '@/components/Themed';
@@ -17,6 +16,11 @@ type Reading = {
   status: string;
   deviceId: string;
   timestamp: string;
+  latitude?: number;
+  longitude?: number;
+  altitude?: number;
+  speed?: number;
+  satellites?: number;
 };
 
 export default function HistoryScreen() {
@@ -24,20 +28,28 @@ export default function HistoryScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(
+    const readingsQuery = query(
       collection(db, 'readings'),
       orderBy('timestamp', 'desc'),
-      limit(50)   // last 50 readings
+      limit(50)
     );
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<Reading, 'id'>),
-      }));
-      setReadings(data);
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      readingsQuery,
+      (snapshot) => {
+        const data = snapshot.docs.map((document) => ({
+          id: document.id,
+          ...(document.data() as Omit<Reading, 'id'>),
+        }));
+
+        setReadings(data);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Failed to load readings:', error);
+        setLoading(false);
+      }
+    );
 
     return unsubscribe;
   }, []);
@@ -74,17 +86,43 @@ export default function HistoryScreen() {
             <View style={styles.row}>
               <View style={styles.rowLeft}>
                 <Text style={styles.temp}>{item.temperature}°C</Text>
+
                 <Text style={styles.meta}>
-                  {item.deviceId} · {time}
+                  Device: {item.deviceId}
                 </Text>
+
+                <Text style={styles.meta}>
+                  Time: {time}
+                </Text>
+
+                {item.latitude !== undefined &&
+                  item.longitude !== undefined && (
+                    <Text style={styles.location}>
+                      GPS: {item.latitude.toFixed(6)},{' '}
+                      {item.longitude.toFixed(6)}
+                    </Text>
+                  )}
+
+                {item.speed !== undefined && (
+                  <Text style={styles.meta}>
+                    Speed: {item.speed.toFixed(2)} km/h
+                  </Text>
+                )}
+
+                {item.satellites !== undefined && (
+                  <Text style={styles.meta}>
+                    Satellites: {item.satellites}
+                  </Text>
+                )}
               </View>
+
               <Text
                 style={[
                   styles.badge,
                   { color: isAbnormal ? 'red' : 'green' },
                 ]}
               >
-                {isAbnormal ? '🔴 ABNORMAL' : '🟢 NORMAL'}
+                {isAbnormal ? 'ABNORMAL' : 'NORMAL'}
               </Text>
             </View>
           );
@@ -120,11 +158,12 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: 14,
   },
   rowLeft: {
     flex: 1,
+    paddingRight: 12,
   },
   temp: {
     fontSize: 22,
@@ -134,6 +173,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.6,
     marginTop: 4,
+  },
+  location: {
+    fontSize: 13,
+    color: 'green',
+    marginTop: 6,
   },
   badge: {
     fontSize: 13,
